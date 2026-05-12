@@ -29,33 +29,33 @@ vector<pair<char , char>> FSM(map<char , vector<transition>> states){
             cell c;   //cell initialization
             c.name = {it->first , it2->first}; //assigning name
             
+            //assigning states and cnds by looping through all input's next state 
+            //(asking user to enter the number of inputs will be just beneficial for the gui part).....
+            for(int j = 0 ;j<it->second.size();j++){
             //assigning states based upon O/Ps
-            if (it->second[0].output != it2->second[0].output || it->second[1].output != it2->second[1].output)
-            c.state = 0;
-
+            if (it->second[j].output != it2->second[j].output){
+            c.state = 0;break;
+            }
             //assigning states based upon nextstates
-            else if (it->second[0].nextState == it2->second[0].nextState && it->second[1].nextState == it2->second[1].nextState){
-                c.state = 2;
+            else if (it->second[j].nextState == it2->second[j].nextState){
+                if(c.cnds.empty()){
+                    c.state = 2;
+                }
+                continue;
             }
 
             //assigning cnds for unequal nextstates
             else{
                 c.state = 1;
                 //adding condition to cnds
-                char a = it->second[0].nextState;
-                char b = it2->second[0].nextState;
+                char a = it->second[j].nextState;
+                char b = it2->second[j].nextState;
                 if(a>b)swap(a,b);
             
                 if (a != b)
                     c.cnds.push_back({a, b});
-
-                a = it->second[1].nextState;
-                b = it2->second[1].nextState;
-                if (a > b)swap(a, b);
-
-                if (a != b)
-                    c.cnds.push_back({a, b});
             }
+        }
 
             table.push_back(c);
             tablestates[c.name] = c.state;
@@ -111,31 +111,102 @@ vector<pair<char , char>> FSM(map<char , vector<transition>> states){
     return equivalants;
 }
 
-int main(){
+int main()
+{
     ios::sync_with_stdio(0);
     cin.tie(0);
 
-    int numStates;
+    int numStates, numInputs;
+    string type; // mealy or moore
+
     
-    if (!(cin >> numStates))
+    if (!(cin >> type >> numInputs >> numStates))
         return 0;
+    
+    numInputs = pow(2,numInputs);
 
     for (int i = 0; i < numStates; i++)
     {
-        char stateName, next0, next1;
-        int out0, out1;
-        
-        cin >> stateName >> next0 >> out0 >> next1 >> out1;
+        char stateName;
+        cin >> stateName;
 
-        states[stateName].push_back({next0, out0});
-        states[stateName].push_back({next1, out1});
+        if (type == "moore")
+        {
+            int stateOutput;
+            vector<char> nextStates(numInputs);
+
+            for (int j = 0; j < numInputs; j++)
+                cin >> nextStates[j];
+            cin >> stateOutput;
+
+            for (int j = 0; j < numInputs; j++)
+            {
+                states[stateName].push_back({nextStates[j], stateOutput});
+            }
+        }
+        else
+        {
+            vector<char> nexts(numInputs);
+            for (int j = 0; j < numInputs; j++)
+                cin >> nexts[j]; 
+
+            for (int j = 0; j < numInputs; j++)
+            {
+                int out;
+                cin >> out;                                   
+                states[stateName].push_back({nexts[j], out}); 
+            }
+        }
     }
 
     vector<pair<char, char>> result = FSM(states);
 
-    for (auto const &p : result)
+    vector<set<char>> equivalenceClasses;
+
+    for (auto pairIt = result.begin(); pairIt != result.end(); pairIt++)
     {
-        cout << p.first << " " << p.second << endl;
+        int firstGroupIdx = -1;
+        int secondGroupIdx = -1;
+
+        for (auto groupIt = equivalenceClasses.begin(); groupIt != equivalenceClasses.end(); groupIt++)
+        {
+            //getting current index based on the iterator position
+            int currentIdx = distance(equivalenceClasses.begin(), groupIt);
+
+            if (groupIt->count(pairIt->first))
+                firstGroupIdx = currentIdx;
+
+            if (groupIt->count(pairIt->second))
+                secondGroupIdx = currentIdx;
+            
+        }
+
+        if (firstGroupIdx == -1 && secondGroupIdx == -1)// neither state is in a group yet
+            equivalenceClasses.push_back({pairIt->first, pairIt->second});
+        
+        else if (firstGroupIdx != -1 && secondGroupIdx == -1)// only the first state exists
+            equivalenceClasses[firstGroupIdx].insert(pairIt->second);
+
+        else if (firstGroupIdx == -1 && secondGroupIdx != -1) // only the second state exists
+            equivalenceClasses[secondGroupIdx].insert(pairIt->first);
+        
+        else if (firstGroupIdx != secondGroupIdx)// both exist in Different groups ---> merge them
+        {
+            equivalenceClasses[firstGroupIdx].insert(equivalenceClasses[secondGroupIdx].begin(),equivalenceClasses[secondGroupIdx].end());
+            // remove the redundant group
+            equivalenceClasses.erase(equivalenceClasses.begin() + secondGroupIdx);
+        }
     }
+
+    // final output for the Python gui 
+    for (auto groupIt = equivalenceClasses.begin(); groupIt != equivalenceClasses.end(); groupIt++)
+    {
+        for (auto stateIt = groupIt->begin(); stateIt != groupIt->end(); stateIt++)
+        {
+            cout << *stateIt << " ";
+        }
+        cout << "\n";
+    }
+
     return 0;
 }
